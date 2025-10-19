@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GIKI Chatbot</title>
+<link rel="icon" href="data:," />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #121212;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  .chat-container {
+    background-color: #1e1e1e;
+    width: 420px;
+    max-height: 90vh;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+  }
+
+  .chat-header {
+    background-color: #2b2b2b;
+    padding: 16px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid #333;
+  }
+
+  .chat-messages {
+    flex-grow: 1;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+  }
+
+  .message {
+    max-width: 75%;
+    padding: 12px 16px;
+    border-radius: 18px;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    word-wrap: break-word;
+    opacity: 0;
+    animation: fadeInUp 0.3s forwards;
+  }
+
+  .user { 
+    align-self: flex-end; 
+    background-color: #0a84ff; 
+    color: #fff; 
+    border-bottom-right-radius: 4px;
+  }
+
+  .bot { 
+    align-self: flex-start; 
+    background-color: #2c2c2c; 
+    color: #e0e0e0; 
+    border-bottom-left-radius: 4px;
+  }
+
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-style: italic;
+    font-size: 0.85rem;
+    color: #aaa;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    background: #0a84ff;
+    border-radius: 50%;
+    animation: blink 1.4s infinite both;
+  }
+
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes blink { 0%, 80%, 100% { opacity: 0; } 40% { opacity: 1; } }
+
+  .chat-input {
+    display: flex;
+    padding: 10px;
+    background-color: #1e1e1e;
+    border-top: 1px solid #333;
+  }
+
+  .chat-input input {
+    flex-grow: 1;
+    border: none;
+    border-radius: 25px;
+    padding: 12px 16px;
+    font-size: 1rem;
+    background-color: #2c2c2c;
+    color: #fff;
+    outline: none;
+    margin-right: 8px;
+  }
+
+  .chat-input input::placeholder { color: #888; }
+
+  .chat-input button {
+    background-color: #0a84ff;
+    border: none;
+    color: white;
+    padding: 0 16px;
+    border-radius: 50%;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  .chat-input button:hover { background-color: #0066cc; }
+</style>
+</head>
+<body>
+
+<div class="chat-container">
+  <div class="chat-header">
+    <span>🤖</span> <span>GIKI Chatbot</span>
+  </div>
+
+  <div class="chat-messages" id="messages">
+    <div class="message bot">👋 Hello! Ask me anything about GIKI.</div>
+  </div>
+
+  <div class="chat-input">
+    <input id="question" type="text" placeholder="Type your question..." autocomplete="off" required />
+    <button id="send-btn">➤</button>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const input = document.getElementById("question");
+  const sendBtn = document.getElementById("send-btn");
+  const messages = document.getElementById("messages");
+
+  function appendMessage(content, sender) {
+    const existingTyping = messages.querySelector(".typing-indicator");
+    if (existingTyping) existingTyping.remove();
+
+    if (sender === "typing") {
+      const typing = document.createElement("div");
+      typing.className = "typing-indicator bot";
+      typing.innerHTML = `Agent is typing<span class="dot"></span><span class="dot"></span><span class="dot"></span>`;
+      messages.appendChild(typing);
+      scrollMessagesToBottom();
+      return;
+    }
+
+    const msg = document.createElement("div");
+    msg.className = `message ${sender}`;
+    // Clean <think> or any HTML tags from response
+    msg.textContent = content.replace(/<[^>]*>/g, "").trim();
+    messages.appendChild(msg);
+    scrollMessagesToBottom();
+  }
+
+  function scrollMessagesToBottom() {
+    messages.scrollTo({ top: messages.scrollHeight, behavior: "smooth" });
+  }
+
+  function toggleInput(disabled) {
+    input.disabled = disabled;
+    sendBtn.disabled = disabled;
+  }
+
+  async function askQuestion(question) {
+    if (!question.trim()) return;
+
+    appendMessage(question, "user");
+    toggleInput(true);
+    appendMessage(null, "typing");
+
+    try {
+      const response = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question })
+      });
+
+      const data = await response.json();
+      appendMessage(data.answer || "🤷 Sorry, no answer found.", "bot");
+    } catch (err) {
+      console.error(err);
+      appendMessage("⚠ Sorry, something went wrong.", "bot");
+    } finally {
+      toggleInput(false);
+      input.focus();
+    }
+  }
+
+  sendBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    const question = input.value;
+    if (question.trim()) {
+      input.value = "";
+      askQuestion(question);
+    }
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const question = input.value;
+      if (question.trim()) {
+        input.value = "";
+        askQuestion(question);
+      }
+    }
+  });
+
+  input.focus();
+});
+</script>
+
+</body>
+</html>

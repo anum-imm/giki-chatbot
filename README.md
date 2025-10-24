@@ -1,4 +1,3 @@
-✅ Improved & Polished README.md
 # Chat Assistant + Pinecone DB
 
 ---
